@@ -98,14 +98,13 @@ def get_all_trains_info():
         #  response_model=Dict[str, Station], 
          status_code=status.HTTP_200_OK)
 def get_train_info(train_id: str):
-    train = trains_db[train_id]
-
-    if not train:
+    if train_id not in trains_db:
         raise HTTPException(
             status_code=404,
             detail=f"Train with {train_id} not found."
         )
 
+    train = trains_db[train_id]
 
     return train
 
@@ -124,10 +123,12 @@ def add_train(train_info: NewTrainRequest):
             detail=f"A train with similar Id {train_id} already exists"
         )
     
-    # Update trains_db
-    trains_db[train_id] = train_info.schedule.model_dump()
-    
-    # Also update stations_db for consistency
+    schedule_as_dict = {
+        station_name: stop_info.model_dump() 
+        for station_name, stop_info in train_info.schedule.items()
+    }
+    trains_db[train_id] = schedule_as_dict
+
     for station_name, stop_info in train_info.schedule.items():
         if station_name not in stations_db:
             stations_db[station_name] = {}
@@ -169,11 +170,7 @@ def add_or_update_station(station_name: str, train_info: AddToStationRequest):
     if station_name not in stations_db:
         stations_db[station_name] = {}
         
-    stations_db[station_name][train_id] = {
-        "arrival": train_info.arrival,
-        "departure": train_info.departure,
-        "days": train_info.days
-    }
+    stations_db[station_name][train_id] = train_info.model_dump(exclude={"train_id"})
 
     save_data()
     
